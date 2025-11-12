@@ -70,7 +70,7 @@ export const subscribeToJobs = (
     constraints.push(where('date', '>=', toTimestamp(start)))
   }
   if (end) {
-    constraints.push(where('date', '<', toTimestamp(end)))
+    constraints.push(where('date', '<=', toTimestamp(end)))
   }
   if (status && status !== 'all') {
     constraints.push(where('status', '==', status))
@@ -93,7 +93,7 @@ export const subscribeToCleanerJobs = ({ uid, start, end }, onNext, onError) => 
     orderBy('date', 'asc'),
   ]
   if (start) constraints.push(where('date', '>=', toTimestamp(start)))
-  if (end) constraints.push(where('date', '<', toTimestamp(end)))
+  if (end) constraints.push(where('date', '<=', toTimestamp(end)))
   const q = query(jobsCollection, ...constraints)
   return onSnapshot(q, onNext, onError)
 }
