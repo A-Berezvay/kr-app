@@ -32,25 +32,44 @@ export default function Users(){
   }
 
   return (
-    <div style={{padding:16}}>
-      <h2>Users (Firestore collection)</h2>
-      <form onSubmit={add} style={{display:'flex', gap:8}}>
-        <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="email" />
-        <select value={role} onChange={e=>setRole(e.target.value)}>
+    <section className="page">
+      <header className="page-header">
+        <h2>Users</h2>
+        <p className="page-subtitle">Invite teammates and manage their permissions.</p>
+      </header>
+      <form onSubmit={add} className="panel form-inline">
+        <input
+          className="input"
+          value={email}
+          onChange={e=>setEmail(e.target.value)}
+          placeholder="email"
+        />
+        <select
+          className="select"
+          value={role}
+          onChange={e=>setRole(e.target.value)}
+        >
           <option value="user">user</option>
           <option value="admin">admin</option>
         </select>
-        <button type="submit">Add</button>
+        <button type="submit" className="btn btn-primary">Add user</button>
       </form>
-      <ul>
+      <ul className="item-list">
         {users.map(u => (
-          <li key={u.id} style={{display:'flex', gap:8, alignItems:'center'}}>
-            <span>{u.email} — {u.role}</span>
-            <button onClick={()=>toggleRole(u)}>Toggle role</button>
-            <button onClick={()=>remove(u.id)}>Delete</button>
+          <li key={u.id} className="item">
+            <span className="item-title">{u.email}</span>
+            <span className="item-meta">Role: {u.role}</span>
+            <div className="item-actions">
+              <button type="button" className="btn btn-secondary" onClick={()=>toggleRole(u)}>
+                Toggle role
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={()=>remove(u.id)}>
+                Delete
+              </button>
+            </div>
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   )
 }

@@ -26,20 +26,32 @@ export default function Jobs(){
   }
 
   return (
-    <div style={{padding:16}}>
-      <h2>Jobs</h2>
-      <form onSubmit={add} style={{display:'flex', gap:8}}>
-        <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Job title" />
-        <button type="submit">Add</button>
+    <section className="page">
+      <header className="page-header">
+        <h2>Jobs</h2>
+        <p className="page-subtitle">Manage job postings and opportunities in one place.</p>
+      </header>
+      <form onSubmit={add} className="panel form-inline">
+        <input
+          className="input"
+          value={title}
+          onChange={e=>setTitle(e.target.value)}
+          placeholder="Job title"
+        />
+        <button type="submit" className="btn btn-primary">Add job</button>
       </form>
-      <ul>
+      <ul className="item-list">
         {jobs.map(j => (
-          <li key={j.id} style={{display:'flex', gap:8, alignItems:'center'}}>
-            <span>{j.title}</span>
-            <button onClick={()=>remove(j.id)}>Delete</button>
+          <li key={j.id} className="item">
+            <span className="item-title">{j.title}</span>
+            <div className="item-actions">
+              <button type="button" className="btn btn-secondary" onClick={()=>remove(j.id)}>
+                Delete
+              </button>
+            </div>
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   )
 }

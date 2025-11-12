@@ -26,20 +26,32 @@ export default function Clients(){
   }
 
   return (
-    <div style={{padding:16}}>
-      <h2>Clients</h2>
-      <form onSubmit={add} style={{display:'flex', gap:8}}>
-        <input value={name} onChange={e=>setName(e.target.value)} placeholder="Client name" />
-        <button type="submit">Add</button>
+    <section className="page">
+      <header className="page-header">
+        <h2>Clients</h2>
+        <p className="page-subtitle">Keep track of every client your team works with.</p>
+      </header>
+      <form onSubmit={add} className="panel form-inline">
+        <input
+          className="input"
+          value={name}
+          onChange={e=>setName(e.target.value)}
+          placeholder="Client name"
+        />
+        <button type="submit" className="btn btn-primary">Add client</button>
       </form>
-      <ul>
+      <ul className="item-list">
         {clients.map(c => (
-          <li key={c.id} style={{display:'flex', gap:8, alignItems:'center'}}>
-            <span>{c.name}</span>
-            <button onClick={()=>remove(c.id)}>Delete</button>
+          <li key={c.id} className="item">
+            <span className="item-title">{c.name}</span>
+            <div className="item-actions">
+              <button type="button" className="btn btn-secondary" onClick={()=>remove(c.id)}>
+                Delete
+              </button>
+            </div>
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   )
 }
