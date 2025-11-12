@@ -7,7 +7,7 @@ import JobList from '../components/jobs/JobList'
 import StatCards from '../components/jobs/StatCards'
 import JobModal from '../components/jobs/JobModal'
 import AssignDialog from '../components/jobs/AssignDialog'
-import { endOfToday, endOfWeek, startOfToday, startOfWeek } from '../lib/dates'
+import { endOfToday, getRollingWeekRange, startOfToday } from '../lib/dates'
 import {
   assignCleaners,
   createJob,
@@ -91,10 +91,11 @@ export default function Jobs() {
   }, [filters])
 
   useEffect(() => {
+    const { start, end } = getRollingWeekRange()
     const unsub = subscribeToJobs(
       {
-        start: startOfWeek(new Date()),
-        end: endOfWeek(new Date()),
+        start,
+        end,
         status: 'all',
       },
       (snapshot) => setWeekJobs(mapSnapshot(snapshot)),
@@ -277,7 +278,7 @@ export default function Jobs() {
 
 function computeRange(range) {
   if (range === 'week') {
-    return { start: startOfWeek(new Date()), end: endOfWeek(new Date()) }
+    return getRollingWeekRange()
   }
   return { start: startOfToday(), end: endOfToday() }
 }
