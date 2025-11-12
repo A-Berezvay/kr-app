@@ -87,6 +87,19 @@ export const addMinutes = (value: Date | string | number, minutes: number) => {
   return result
 }
 
+export const addDays = (value: Date | string | number, days: number) => {
+  const date = ensureDate(value)
+  const result = new Date(date)
+  result.setDate(date.getDate() + days)
+  return result
+}
+
+export const getRollingWeekRange = (value: Date | string | number = new Date()) => {
+  const start = startOfDay(value)
+  const end = endOfDay(addDays(start, 6))
+  return { start, end }
+}
+
 export const formatDuration = (minutes: number) => {
   if (!minutes) return '0 mins'
   if (minutes < 60) return `${minutes} mins`

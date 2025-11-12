@@ -5,12 +5,11 @@ import { useAuth } from '../services/auth'
 import Toast from '../components/common/Toast'
 import {
   endOfToday,
-  endOfWeek,
   formatDayLabel,
   formatDuration,
   formatTime,
+  getRollingWeekRange,
   startOfToday,
-  startOfWeek,
 } from '../lib/dates'
 import { markJobCompleted, markJobStarted, subscribeToCleanerJobs } from '../services/jobs'
 
@@ -39,9 +38,10 @@ export default function MyJobs() {
 
   useEffect(() => {
     if (!user) return
-    const { start, end } = tab === 'today'
-      ? { start: startOfToday(), end: endOfToday() }
-      : { start: startOfWeek(new Date()), end: endOfWeek(new Date()) }
+    const { start, end } =
+      tab === 'today'
+        ? { start: startOfToday(), end: endOfToday() }
+        : getRollingWeekRange()
     setLoading(true)
     const unsub = subscribeToCleanerJobs(
       { uid: user.uid, start, end },
