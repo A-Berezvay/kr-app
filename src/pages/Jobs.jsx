@@ -1,165 +1,283 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { collection, addDoc, onSnapshot, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore'
+import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore'
 import { db } from '../firebase'
+import Toast from '../components/common/Toast'
+import JobFilters from '../components/jobs/JobFilters'
+import JobList from '../components/jobs/JobList'
+import StatCards from '../components/jobs/StatCards'
+import JobModal from '../components/jobs/JobModal'
+import AssignDialog from '../components/jobs/AssignDialog'
+import { endOfToday, endOfWeek, startOfToday, startOfWeek } from '../lib/dates'
+import {
+  assignCleaners,
+  createJob,
+  deleteJob,
+  markJobCompleted,
+  markJobStarted,
+  subscribeToJobs,
+  updateJob,
+} from '../services/jobs'
 
-export default function Jobs(){
+const defaultFilters = {
+  range: 'today',
+  status: 'all',
+  clientId: '',
+  cleanerIds: [],
+}
+
+const mapSnapshot = (snapshot) =>
+  snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  }))
+
+export default function Jobs() {
+  const [filters, setFilters] = useState(defaultFilters)
   const [jobs, setJobs] = useState([])
-  const [form, setForm] = useState({
-    title: '',
-    department: 'Operations',
-    location: 'Remote',
-    status: 'open',
-    type: 'Full-time',
-  })
+  const [loading, setLoading] = useState(true)
+  const [clients, setClients] = useState([])
+  const [cleaners, setCleaners] = useState([])
+  const [toast, setToast] = useState(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [editingJob, setEditingJob] = useState(null)
+  const [assignJobTarget, setAssignJobTarget] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [assignSaving, setAssignSaving] = useState(false)
+  const [actionJobId, setActionJobId] = useState(null)
+  const [weekJobs, setWeekJobs] = useState([])
 
-  useEffect(()=>{
-    const col = collection(db, 'jobs')
-    const unsub = onSnapshot(col, snap => {
-      setJobs(snap.docs.map(d => ({id: d.id, ...d.data()})))
+  useEffect(() => {
+    const clientsQuery = query(collection(db, 'clients'), orderBy('name', 'asc'))
+    const unsub = onSnapshot(clientsQuery, (snapshot) => {
+      setClients(mapSnapshot(snapshot))
     })
     return unsub
-  },[])
+  }, [])
 
-  const add = async (e) => {
-    e.preventDefault()
-    if(!form.title.trim()) return
-    await addDoc(collection(db,'jobs'), {
-      ...form,
-      createdAt: serverTimestamp(),
+  useEffect(() => {
+    const cleanersQuery = query(collection(db, 'users'), where('role', '==', 'cleaner'))
+    const unsub = onSnapshot(cleanersQuery, (snapshot) => {
+      setCleaners(mapSnapshot(snapshot))
     })
-    setForm({ title: '', department: 'Operations', location: 'Remote', status: 'open', type: 'Full-time' })
-  }
+    return unsub
+  }, [])
 
-  const remove = async (id) => {
-    await deleteDoc(doc(db,'jobs', id))
-  }
+  useEffect(() => {
+    const { start, end } = computeRange(filters.range)
+    setLoading(true)
+    const unsub = subscribeToJobs(
+      {
+        start,
+        end,
+        status: filters.status,
+        clientId: filters.clientId,
+        cleanerIds: filters.cleanerIds,
+      },
+      (snapshot) => {
+        const list = mapSnapshot(snapshot)
+        setJobs(list)
+        setLoading(false)
+      },
+      (error) => {
+        console.error(error)
+        setToast({ type: 'error', message: 'Failed to load jobs.' })
+        setLoading(false)
+      },
+    )
+    return () => {
+      unsub?.()
+    }
+  }, [filters])
 
-  const toggleStatus = async (job) => {
-    const ref = doc(db, 'jobs', job.id)
-    const next = (job.status || 'open') === 'open' ? 'closed' : 'open'
-    await updateDoc(ref, { status: next })
-  }
+  useEffect(() => {
+    const unsub = subscribeToJobs(
+      {
+        start: startOfWeek(new Date()),
+        end: endOfWeek(new Date()),
+        status: 'all',
+      },
+      (snapshot) => setWeekJobs(mapSnapshot(snapshot)),
+    )
+    return () => {
+      unsub?.()
+    }
+  }, [])
 
   const stats = useMemo(() => {
-    const total = jobs.length
-    const open = jobs.filter(j => (j.status || 'open') === 'open').length
-    const remote = jobs.filter(j => (j.location || '').toLowerCase().includes('remote')).length
-    return { total, open, remote }
-  }, [jobs])
+    const todayStart = startOfToday()
+    const todayEnd = endOfToday()
+    let todayScheduled = 0
+    let weekScheduled = 0
+    let completedThisWeek = 0
 
-  const updateField = (field) => (e) => {
-    setForm(prev => ({
-      ...prev,
-      [field]: e.target.value,
-    }))
+    weekJobs.forEach((job) => {
+      const jobDate = job.date?.toDate ? job.date.toDate() : new Date(job.date)
+      const status = job.status || 'scheduled'
+      if (status === 'scheduled') {
+        weekScheduled += 1
+        if (jobDate >= todayStart && jobDate <= todayEnd) {
+          todayScheduled += 1
+        }
+      }
+      if (status === 'completed') {
+        completedThisWeek += 1
+      }
+    })
+
+    return { todayScheduled, weekScheduled, completedThisWeek }
+  }, [weekJobs])
+
+  const handleCreateClick = () => {
+    setEditingJob(null)
+    setModalOpen(true)
   }
 
-  const formatDate = (job) => {
-    if (!job.createdAt) return 'Just now'
-    const date = job.createdAt.toDate ? job.createdAt.toDate() : new Date(job.createdAt)
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  const handleModalClose = () => {
+    setModalOpen(false)
+    setEditingJob(null)
+  }
+
+  const handleAssignClose = () => {
+    setAssignOpen(false)
+    setAssignJobTarget(null)
+  }
+
+  const handleSaveJob = async (payload) => {
+    setSaving(true)
+    try {
+      if (editingJob) {
+        await updateJob(editingJob.id, payload)
+        setToast({ type: 'success', message: 'Job updated successfully.' })
+      } else {
+        await createJob(payload)
+        setToast({ type: 'success', message: 'Job created successfully.' })
+      }
+      setModalOpen(false)
+      setEditingJob(null)
+    } catch (error) {
+      console.error(error)
+      setToast({ type: 'error', message: 'Failed to save job.' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleAssignSave = async (userIds) => {
+    if (!assignJobTarget) return
+    setAssignSaving(true)
+    try {
+      await assignCleaners(assignJobTarget.id, userIds)
+      setToast({ type: 'success', message: 'Assignment updated.' })
+      handleAssignClose()
+    } catch (error) {
+      console.error(error)
+      setToast({ type: 'error', message: 'Failed to update assignment.' })
+    } finally {
+      setAssignSaving(false)
+    }
+  }
+
+  const handleDelete = async (job) => {
+    if (!window.confirm('Delete this job?')) return
+    try {
+      await deleteJob(job.id)
+      setToast({ type: 'success', message: 'Job deleted.' })
+    } catch (error) {
+      console.error(error)
+      setToast({ type: 'error', message: 'Failed to delete job.' })
+    }
+  }
+
+  const handleStart = async (job) => {
+    setActionJobId(job.id)
+    try {
+      await markJobStarted(job.id)
+      setToast({ type: 'success', message: 'Job started.' })
+    } catch (error) {
+      console.error(error)
+      setToast({ type: 'error', message: 'Failed to mark job as started.' })
+    } finally {
+      setActionJobId(null)
+    }
+  }
+
+  const handleComplete = async (job) => {
+    setActionJobId(job.id)
+    try {
+      await markJobCompleted(job.id)
+      setToast({ type: 'success', message: 'Job completed.' })
+    } catch (error) {
+      console.error(error)
+      setToast({ type: 'error', message: 'Failed to complete job.' })
+    } finally {
+      setActionJobId(null)
+    }
   }
 
   return (
     <section className="page">
       <header className="page-header">
-        <h2>Jobs</h2>
-        <p className="page-subtitle">Manage job postings and opportunities in one place.</p>
+        <h2>Operations schedule</h2>
+        <p className="page-subtitle">
+          View upcoming jobs, assign cleaners, and track completion in real time.
+        </p>
       </header>
-      <section className="stats-grid" aria-label="Job overview">
-        <article className="stat-card">
-          <span className="stat-label">Published roles</span>
-          <span className="stat-value">{stats.total}</span>
-        </article>
-        <article className="stat-card">
-          <span className="stat-label">Open positions</span>
-          <span className="stat-value">{stats.open}</span>
-          <span className="stat-caption">Accepting new applicants</span>
-        </article>
-        <article className="stat-card">
-          <span className="stat-label">Remote friendly</span>
-          <span className="stat-value">{stats.remote}</span>
-          <span className="stat-caption">Listing "remote" in location</span>
-        </article>
-      </section>
-      <form onSubmit={add} className="panel form-grid" aria-label="Add job">
-        <label className="form-field">
-          <span>Job title</span>
-          <input
-            className="input"
-            value={form.title}
-            onChange={updateField('title')}
-            placeholder="Senior Project Manager"
-            required
-          />
-        </label>
-        <label className="form-field">
-          <span>Department</span>
-          <input
-            className="input"
-            value={form.department}
-            onChange={updateField('department')}
-            placeholder="Operations"
-          />
-        </label>
-        <label className="form-field">
-          <span>Location</span>
-          <input
-            className="input"
-            value={form.location}
-            onChange={updateField('location')}
-            placeholder="Remote / Austin, TX"
-          />
-        </label>
-        <label className="form-field">
-          <span>Employment type</span>
-          <select className="select" value={form.type} onChange={updateField('type')}>
-            <option>Full-time</option>
-            <option>Part-time</option>
-            <option>Contract</option>
-            <option>Freelance</option>
-          </select>
-        </label>
-        <label className="form-field">
-          <span>Status</span>
-          <select className="select" value={form.status} onChange={updateField('status')}>
-            <option value="open">Open</option>
-            <option value="closed">Closed</option>
-          </select>
-        </label>
-        <div className="form-actions">
-          <button type="submit" className="btn btn-primary">Add job</button>
-        </div>
-      </form>
-      <ul className="item-list">
-        {jobs.map(j => (
-          <li key={j.id} className="item">
-            <div className="item-main">
-              <div>
-                <span className="item-title">{j.title}</span>
-                <div className="item-meta">Posted {formatDate(j)}</div>
-              </div>
-              <div className="item-tags">
-                <span className="badge badge-muted">{j.department || 'Operations'}</span>
-                <span className="badge badge-soft">{j.type || 'Full-time'}</span>
-                <span className={`badge ${((j.status || 'open') === 'open' ? 'badge-success' : 'badge-muted')}`}>{(j.status || 'open').replace(/^\w/, s => s.toUpperCase())}</span>
-              </div>
-            </div>
-            <div className="item-detail">
-              <span className="item-label">Location</span>
-              <span>{j.location || '—'}</span>
-            </div>
-            <div className="item-actions">
-              <button type="button" className="btn btn-secondary" onClick={()=>toggleStatus(j)}>
-                {(j.status || 'open') === 'open' ? 'Close role' : 'Reopen'}
-              </button>
-              <button type="button" className="btn btn-ghost" onClick={()=>remove(j.id)}>
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <Toast
+        message={toast?.message}
+        type={toast?.type}
+        onDismiss={() => setToast(null)}
+      />
+      <StatCards stats={stats} />
+      <JobFilters
+        filters={filters}
+        cleaners={cleaners}
+        clients={clients}
+        onChange={setFilters}
+        onCreate={handleCreateClick}
+      />
+      <JobList
+        jobs={jobs}
+        clients={clients}
+        cleaners={cleaners}
+        loading={loading}
+        onAssign={(job) => {
+          setAssignJobTarget(job)
+          setAssignOpen(true)
+        }}
+        onEdit={(job) => {
+          setEditingJob(job)
+          setModalOpen(true)
+        }}
+        onDelete={handleDelete}
+        onStart={handleStart}
+        onComplete={handleComplete}
+        actionJobId={actionJobId}
+      />
+      <JobModal
+        open={modalOpen}
+        onClose={handleModalClose}
+        onSubmit={handleSaveJob}
+        clients={clients}
+        cleaners={cleaners}
+        initialJob={editingJob}
+        saving={saving}
+      />
+      <AssignDialog
+        open={assignOpen}
+        onClose={handleAssignClose}
+        job={assignJobTarget}
+        cleaners={cleaners}
+        onSave={handleAssignSave}
+        saving={assignSaving}
+      />
     </section>
   )
+}
+
+function computeRange(range) {
+  if (range === 'week') {
+    return { start: startOfWeek(new Date()), end: endOfWeek(new Date()) }
+  }
+  return { start: startOfToday(), end: endOfToday() }
 }
