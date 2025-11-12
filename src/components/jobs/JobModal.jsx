@@ -64,7 +64,7 @@ export default function JobModal({ open, onClose, onSubmit, clients, cleaners, i
   }
 
   const activeCleaners = useMemo(
-    () => cleaners.filter((cleaner) => cleaner.active !== false),
+    () => cleaners.filter((cleaner) => (cleaner.status || 'invited') === 'active' && cleaner.role === 'cleaner'),
     [cleaners],
   )
 

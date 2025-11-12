@@ -6,7 +6,7 @@ export default function Users(){
   const [users, setUsers] = useState([])
   const [form, setForm] = useState({
     email: '',
-    role: 'user',
+    role: 'cleaner',
     status: 'invited',
     name: '',
   })
@@ -26,7 +26,7 @@ export default function Users(){
       ...form,
       createdAt: serverTimestamp(),
     })
-    setForm({ email: '', role: 'user', status: 'invited', name: '' })
+    setForm({ email: '', role: 'cleaner', status: 'invited', name: '' })
   }
 
   const remove = async (id) => {
@@ -35,7 +35,7 @@ export default function Users(){
 
   const toggleRole = async (u) => {
     const ref = doc(db,'users', u.id)
-    await updateDoc(ref, { role: u.role === 'admin' ? 'user' : 'admin' })
+    await updateDoc(ref, { role: u.role === 'admin' ? 'cleaner' : 'admin' })
   }
 
   const toggleStatus = async (u) => {
