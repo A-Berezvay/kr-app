@@ -32,3 +32,29 @@ Firebase hosting / deploy
 
 Notes
 - Firestore rules and firebase.json are included in the repository; update project IDs before deploying.
+
+## Seed sample data
+
+To try the scheduler quickly you can seed a handful of clients and jobs directly in
+Firestore:
+
+1. In the Firebase console open **Firestore Database → Data**.
+2. Ensure your signed-in test users have a document under `users/{uid}` with:
+   - `role`: set to `admin` or `cleaner`
+   - `displayName`, `email`, optional `phone`
+   - `active`: `true`
+3. Create two client documents in the `clients` collection. Each client should have:
+   - `name`: e.g. `Kolding HQ`
+   - `address`: street + city
+   - `notes`: optional access information
+4. Add a few job documents in the `jobs` collection:
+   - `clientId`: the document ID of a client
+   - `date`: Firestore timestamp for the scheduled start time
+   - `durationMinutes`: e.g. `90`
+   - `status`: `scheduled`
+   - `assignedUserIds`: array of cleaner user IDs (can be empty)
+   - `notes`: optional
+   - `createdAt` / `updatedAt`: set to server timestamps
+
+Once these documents exist, the admin scheduler and “My Jobs” cleaner view will
+show the seeded data in real time.

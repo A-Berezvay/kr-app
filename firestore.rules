@@ -7,18 +7,37 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Check a users collection document for role == 'admin'
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Allow read for all signed-in users
-    match /{document=**} {
-      allow read: if isSignedIn();
+    function isCleaner() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'cleaner';
     }
 
-    // Allow writes only for admins (across all collections)
-    match /{document=**} {
-      allow write: if isAdmin();
+    function cleanerStatusUpdate() {
+      return isCleaner()
+        && request.auth.uid in resource.data.assignedUserIds
+        && request.resource.data.assignedUserIds == resource.data.assignedUserIds
+        && resource.data.diff(request.resource.data).changedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status in ['in_progress', 'completed'];
+    }
+
+    match /jobs/{jobId} {
+      allow read: if isAdmin() || (isCleaner() && request.auth.uid in resource.data.assignedUserIds);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || cleanerStatusUpdate();
+    }
+
+    match /clients/{clientId} {
+      allow read: if isAdmin() || isCleaner();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow create, update, delete: if isAdmin();
     }
   }
 }

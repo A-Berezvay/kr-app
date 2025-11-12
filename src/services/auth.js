@@ -14,16 +14,20 @@ export const useAuth = () => useContext(AuthContext)
 
 function useProvideAuth(){
   const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
   useEffect(()=>{
     const unsub = onAuthStateChanged(auth, (u)=>{
       setUser(u)
+      setLoading(false)
     })
-    return unsub
+    return () => {
+      unsub()
+    }
   },[])
 
   const signOut = async () => {
     await fbSignOut(auth)
   }
 
-  return { user, signOut }
+  return { user, loading, signOut }
 }
