@@ -33,8 +33,6 @@ const mapSnapshot = (snapshot) =>
 
 export default function Jobs() {
   const [filters, setFilters] = useState(defaultFilters)
-  const [jobs, setJobs] = useState([])
-  const [loading, setLoading] = useState(true)
   const [clients, setClients] = useState([])
   const [cleaners, setCleaners] = useState([])
   const [toast, setToast] = useState(null)
@@ -62,33 +60,6 @@ export default function Jobs() {
     })
     return unsub
   }, [])
-
-  useEffect(() => {
-    const { start, end } = computeRange(filters.range)
-    setLoading(true)
-    const unsub = subscribeToJobs(
-      {
-        start,
-        end,
-        status: filters.status,
-        clientId: filters.clientId,
-        cleanerIds: filters.cleanerIds,
-      },
-      (snapshot) => {
-        const list = mapSnapshot(snapshot)
-        setJobs(list)
-        setLoading(false)
-      },
-      (error) => {
-        console.error(error)
-        setToast({ type: 'error', message: 'Failed to load jobs.' })
-        setLoading(false)
-      },
-    )
-    return () => {
-      unsub?.()
-    }
-  }, [filters])
 
   useEffect(() => {
     const { start, end } = getRollingWeekRange()
@@ -238,10 +209,9 @@ export default function Jobs() {
         onCreate={handleCreateClick}
       />
       <JobList
-        jobs={jobs}
+        filters={filters}
         clients={clients}
         cleaners={cleaners}
-        loading={loading}
         onAssign={(job) => {
           setAssignJobTarget(job)
           setAssignOpen(true)
@@ -274,11 +244,4 @@ export default function Jobs() {
       />
     </section>
   )
-}
-
-function computeRange(range) {
-  if (range === 'week') {
-    return getRollingWeekRange()
-  }
-  return { start: startOfToday(), end: endOfToday() }
 }

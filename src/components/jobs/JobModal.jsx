@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Timestamp } from 'firebase/firestore'
+import { getClientDisplayName } from '../../lib/clients'
 
 const emptyForm = {
   clientId: '',
@@ -105,7 +106,7 @@ export default function JobModal({ open, onClose, onSubmit, clients, cleaners, i
               </option>
               {clients.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.name}
+                  {getClientDisplayName(item)}
                 </option>
               ))}
             </select>

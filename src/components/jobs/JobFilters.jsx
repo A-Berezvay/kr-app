@@ -1,4 +1,5 @@
 import React from 'react'
+import { getClientDisplayName } from '../../lib/clients'
 
 const statusOptions = [
   { label: 'All statuses', value: 'all' },
@@ -98,7 +99,7 @@ export default function JobFilters({ filters, cleaners, clients, onChange, onCre
             <option value="">All clients</option>
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
-                {client.name}
+                {getClientDisplayName(client)}
               </option>
             ))}
           </select>
