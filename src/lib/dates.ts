@@ -100,6 +100,29 @@ export const getRollingWeekRange = (value: Date | string | number = new Date()) 
   return { start, end }
 }
 
+export const startOfMonth = (value: Date | string | number = new Date()) => {
+  const date = ensureDate(value)
+  const start = new Date(date.getFullYear(), date.getMonth(), 1)
+  start.setHours(0, 0, 0, 0)
+  return start
+}
+
+export const endOfMonth = (value: Date | string | number = new Date()) => {
+  const start = startOfMonth(value)
+  const end = new Date(start)
+  end.setMonth(end.getMonth() + 1)
+  end.setMilliseconds(-1)
+  return end
+}
+
+export const formatMonthLabel = (value: Date | string | number) => {
+  const date = ensureDate(value)
+  return date.toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
 export const formatDuration = (minutes: number) => {
   if (!minutes) return '0 mins'
   if (minutes < 60) return `${minutes} mins`
