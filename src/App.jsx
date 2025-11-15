@@ -12,6 +12,7 @@ import Clients from './pages/Clients'
 import Jobs from './pages/Jobs'
 import Users from './pages/Users'
 import MyJobs from './pages/MyJobs'
+import WorkLog from './pages/WorkLog'
 import { AuthProvider, useAuth } from './services/auth'
 import useRole from './hooks/useRole'
 
@@ -77,6 +78,11 @@ function ProtectedLayout() {
           {roleState.isCleaner && (
             <NavLink to="/my-jobs" className={navClassName}>
               My Jobs
+            </NavLink>
+          )}
+          {(roleState.isAdmin || roleState.isCleaner) && (
+            <NavLink to="/work-log" className={navClassName}>
+              Work log
             </NavLink>
           )}
         </nav>
@@ -153,6 +159,7 @@ export default function App() {
             <Route element={<CleanerRoute />}>
               <Route path="my-jobs" element={<MyJobs />} />
             </Route>
+            <Route path="work-log" element={<WorkLog />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

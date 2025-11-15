@@ -3,6 +3,7 @@ import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { db } from '../firebase'
 import { useAuth } from '../services/auth'
 import Toast from '../components/common/Toast'
+import { useOutletContext } from 'react-router-dom'
 import {
   endOfToday,
   formatDayLabel,
@@ -12,6 +13,7 @@ import {
   startOfToday,
 } from '../lib/dates'
 import { markJobCompleted, markJobStarted, subscribeToCleanerJobs } from '../services/jobs'
+import { recordWorkLogCompletion, recordWorkLogStart } from '../services/workLogs'
 
 const mapSnapshot = (snapshot) =>
   snapshot.docs.map((doc) => ({
@@ -21,6 +23,7 @@ const mapSnapshot = (snapshot) =>
 
 export default function MyJobs() {
   const { user } = useAuth()
+  const roleContext = useOutletContext() || {}
   const [tab, setTab] = useState('today')
   const [jobs, setJobs] = useState([])
   const [clients, setClients] = useState([])
@@ -74,31 +77,63 @@ export default function MyJobs() {
     })
   }, [jobs])
 
-  const handleStart = async (job) => {
-    setActionJobId(job.id)
-    try {
-      await markJobStarted(job.id)
-      setToast({ type: 'success', message: 'Job marked as in progress.' })
-    } catch (error) {
-      console.error(error)
-      setToast({ type: 'error', message: 'Failed to update job status.' })
-    } finally {
-      setActionJobId(null)
+  const buildLogPayload = (job) => {
+    const client = clientMap.get(job.clientId)
+    return {
+      jobId: job.id,
+      jobDate: job.date,
+      clientId: job.clientId,
+      clientName: client?.name,
+      userId: user?.uid,
+      userName: roleContext?.profile?.displayName || user?.displayName || user?.email,
+      userEmail: user?.email,
     }
   }
 
-  const handleComplete = async (job) => {
-    setActionJobId(job.id)
-    try {
-      await markJobCompleted(job.id)
-      setToast({ type: 'success', message: 'Job marked as complete.' })
-    } catch (error) {
-      console.error(error)
-      setToast({ type: 'error', message: 'Failed to update job status.' })
-    } finally {
-      setActionJobId(null)
+const handleStart = async (job) => {
+  setActionJobId(job.id)
+  try {
+    console.log('>>> handleStart: calling markJobStarted')
+    await markJobStarted(job.id)
+    console.log('>>> handleStart: markJobStarted OK')
+
+    if (user) {
+      console.log('>>> handleStart: calling recordWorkLogStart')
+      await recordWorkLogStart(buildLogPayload(job))
+      console.log('>>> handleStart: recordWorkLogStart OK')
     }
+
+    setToast({ type: 'success', message: 'Job marked as in progress.' })
+  } catch (error) {
+    console.error('handleStart ERROR:', error)
+    setToast({ type: 'error', message: 'Failed to update job status.' })
+  } finally {
+    setActionJobId(null)
   }
+}
+
+const handleComplete = async (job) => {
+  setActionJobId(job.id)
+  try {
+    console.log('>>> handleComplete: calling markJobCompleted')
+    await markJobCompleted(job.id)
+    console.log('>>> handleComplete: markJobCompleted OK')
+
+    if (user) {
+      console.log('>>> handleComplete: calling recordWorkLogCompletion')
+      await recordWorkLogCompletion(buildLogPayload(job))
+      console.log('>>> handleComplete: recordWorkLogCompletion OK')
+    }
+
+    setToast({ type: 'success', message: 'Job marked as complete.' })
+  } catch (error) {
+    console.error('handleComplete ERROR:', error)
+    setToast({ type: 'error', message: 'Failed to update job status.' })
+  } finally {
+    setActionJobId(null)
+  }
+}
+
 
   const handleCopy = async (text) => {
     try {
@@ -238,4 +273,3 @@ function statusLabel(status) {
       return 'Scheduled'
   }
 }
-
