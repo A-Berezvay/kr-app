@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
+import { db } from '../firebase'
 import Toast from '../components/common/Toast'
 import { useAuth } from '../services/auth'
 import {
@@ -14,6 +16,7 @@ import {
   deleteWorkLogEntry,
   subscribeToWorkLogs,
   updateWorkLogEntry,
+  createManualWorkLog,
 } from '../services/workLogs'
 
 const mapSnapshot = (snapshot) =>
@@ -51,6 +54,12 @@ export default function WorkLog() {
   const [editForm, setEditForm] = useState(null)
   const [savingEdit, setSavingEdit] = useState(false)
 
+  // manual-add state (admin only)
+  const [users, setUsers] = useState([])
+  const [clients, setClients] = useState([])
+  const [manualModalOpen, setManualModalOpen] = useState(false)
+  const [savingManual, setSavingManual] = useState(false)
+
   const currentMonth = useMemo(() => {
     const base = new Date()
     base.setDate(1)
@@ -67,6 +76,7 @@ export default function WorkLog() {
 
   const queryUserId = isAdmin ? null : user?.uid
 
+  // Subscribe to work logs
   useEffect(() => {
     if (!user) return () => {}
     setLoading(true)
@@ -90,6 +100,26 @@ export default function WorkLog() {
       unsub?.()
     }
   }, [monthRange, queryUserId, user])
+
+  // Load users & clients for manual entry (admins only)
+  useEffect(() => {
+    if (!isAdmin) return
+
+    const usersQuery = query(collection(db, 'users'), orderBy('email', 'asc'))
+    const unsubUsers = onSnapshot(usersQuery, (snap) => {
+      setUsers(mapSnapshot(snap))
+    })
+
+    const clientsQuery = query(collection(db, 'clients'), orderBy('name', 'asc'))
+    const unsubClients = onSnapshot(clientsQuery, (snap) => {
+      setClients(mapSnapshot(snap))
+    })
+
+    return () => {
+      unsubUsers()
+      unsubClients()
+    }
+  }, [isAdmin])
 
   const getEntryDuration = (entry) => {
     if (entry.durationMinutes) return entry.durationMinutes
@@ -181,6 +211,20 @@ export default function WorkLog() {
     }
   }
 
+  const handleCreateManualLog = async (payload) => {
+    setSavingManual(true)
+    try {
+      await createManualWorkLog(payload)
+      setToast({ type: 'success', message: 'Work log added.' })
+      setManualModalOpen(false)
+    } catch (error) {
+      console.error(error)
+      setToast({ type: 'error', message: 'Failed to add work log.' })
+    } finally {
+      setSavingManual(false)
+    }
+  }
+
   return (
     <section className="page">
       <header className="page-header">
@@ -218,6 +262,17 @@ export default function WorkLog() {
           >
             ›
           </button>
+
+          {isAdmin && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ marginLeft: 'auto' }}
+              onClick={() => setManualModalOpen(true)}
+            >
+              Add work log
+            </button>
+          )}
         </div>
         <p className="helper-text">
           Hours are captured automatically when cleaners start and complete jobs from the My Jobs
@@ -319,11 +374,24 @@ export default function WorkLog() {
           saving={savingEdit}
         />
       )}
+
+      {/* Admin manual-create modal */}
+      {isAdmin && (
+        <ManualWorkLogModal
+          open={manualModalOpen}
+          onClose={() => setManualModalOpen(false)}
+          onSave={handleCreateManualLog}
+          users={users}
+          clients={clients}
+          defaultDate={currentMonth}
+          saving={savingManual}
+        />
+      )}
     </section>
   )
 }
 
-// Simple modal living in the same file
+// -------- Edit existing entry modal --------
 function EditWorkLogModal({ open, form, setForm, onClose, onSave, saving }) {
   if (!open) return null
 
@@ -394,6 +462,185 @@ function EditWorkLogModal({ open, form, setForm, onClose, onSave, saving }) {
           </button>
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </footer>
+      </form>
+    </div>
+  )
+}
+
+// -------- Create manual entry modal --------
+function ManualWorkLogModal({
+  open,
+  onClose,
+  onSave,
+  users,
+  clients,
+  defaultDate,
+  saving,
+}) {
+  const [userId, setUserId] = useState('')
+  const [clientId, setClientId] = useState('')
+  const [date, setDate] = useState('')
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
+  const [notes, setNotes] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+    // reset form when opening
+    setUserId('')
+    setClientId('')
+    const iso = defaultDate.toISOString().slice(0, 10)
+    setDate(iso)
+    setStartTime('')
+    setEndTime('')
+    setNotes('')
+  }, [open, defaultDate])
+
+  if (!open) return null
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!userId || !clientId || !date || !startTime || !endTime) return
+
+    const user = users.find((u) => u.id === userId)
+    const client = clients.find((c) => c.id === clientId)
+
+    const start = new Date(`${date}T${startTime}`)
+    const end = new Date(`${date}T${endTime}`)
+
+    onSave({
+      userId,
+      userName: user?.name || user?.displayName || user?.email,
+      userEmail: user?.email || null,
+      clientId,
+      clientName: client?.name || client?.companyName || client?.contactName,
+      workDate: start,
+      startTime: start,
+      endTime: end,
+      notes,
+    })
+  }
+
+  const activeUsers = users.filter((u) => (u.status || 'active') === 'active')
+  const sortedUsers = [...activeUsers].sort((a, b) =>
+    (a.name || a.displayName || a.email || '').localeCompare(
+      b.name || b.displayName || b.email || '',
+    ),
+  )
+
+  const sortedClients = [...clients].sort((a, b) =>
+    (a.name || a.companyName || a.contactName || '').localeCompare(
+      b.name || b.companyName || b.contactName || '',
+    ),
+  )
+
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <form className="modal" onSubmit={handleSubmit}>
+        <header className="modal-header">
+          <h3>Add work log</h3>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onClose}
+            aria-label="Close"
+            disabled={saving}
+          >
+            ×
+          </button>
+        </header>
+        <div className="modal-body">
+          <label className="form-field">
+            <span>Team member</span>
+            <select
+              className="select"
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              required
+            >
+              <option value="">Select user</option>
+              {sortedUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name || u.displayName || u.email}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="form-field">
+            <span>Client</span>
+            <select
+              className="select"
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              required
+            >
+              <option value="">Select client</option>
+              {sortedClients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name || c.companyName || c.contactName}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="form-field">
+            <span>Date</span>
+            <input
+              type="date"
+              className="input"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Start time</span>
+            <input
+              type="time"
+              className="input"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              required
+            />
+          </label>
+
+          <label className="form-field">
+            <span>End time</span>
+            <input
+              type="time"
+              className="input"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              required
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Notes</span>
+            <textarea
+              className="textarea"
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Optional: what was done, special circumstances…"
+            />
+          </label>
+        </div>
+        <footer className="modal-footer">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onClose}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? 'Saving…' : 'Add work log'}
           </button>
         </footer>
       </form>

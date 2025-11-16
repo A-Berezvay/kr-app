@@ -216,6 +216,61 @@ export const subscribeToWorkLogs = (
   return onSnapshot(q, onNext, onError)
 }
 
+/**
+ * Admin-only helper to create a manual work log entry.
+ * Used from the Work Log page "Add work log" modal.
+ */
+export const createManualWorkLog = async ({
+  userId,
+  userName,
+  userEmail,
+  clientId,
+  clientName,
+  workDate, // Date object
+  startTime, // Date object
+  endTime, // Date object
+  notes = '',
+}: {
+  userId: string
+  userName?: string | null
+  userEmail?: string | null
+  clientId?: string | null
+  clientName?: string | null
+  workDate: any
+  startTime: any
+  endTime: any
+  notes?: string
+}) => {
+  if (!userId) throw new Error('userId is required')
+
+  const start = ensureDate(startTime || workDate || new Date())
+  const end = ensureDate(endTime || start)
+  const workDay = startOfDay(ensureDate(workDate || start))
+
+  const durationMinutes = Math.max(Math.round((end.getTime() - start.getTime()) / 60000), 0)
+
+  const now = serverTimestamp()
+
+  return addDoc(workLogsCollection, {
+    userId,
+    userName: userName || null,
+    userEmail: userEmail || null,
+
+    jobId: null, // manual entry has no job
+    clientId: clientId || null,
+    clientName: clientName || null,
+
+    workDate: Timestamp.fromDate(workDay),
+    startTime: Timestamp.fromDate(start),
+    endTime: Timestamp.fromDate(end),
+    durationMinutes,
+    notes,
+
+    createdAt: now,
+    updatedAt: now,
+  })
+}
+
 export const deleteWorkLogEntry = async (id: string) => {
   const ref = doc(db, 'worklogs', id)
   await deleteDoc(ref)
