@@ -15,10 +15,18 @@
   --sidebar-border: rgba(255, 255, 255, 0.08);
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body,
 #root {
   height: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 body {
@@ -47,6 +55,8 @@ button {
   display: flex;
   min-height: 100vh;
   background: var(--color-bg);
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 .sidebar {
@@ -162,6 +172,7 @@ button {
   padding: 48px clamp(24px, 5vw, 60px);
   background: var(--color-bg);
   overflow-y: auto;
+  max-width: 100vw;
 }
 
 .page {
@@ -169,6 +180,7 @@ button {
   flex-direction: column;
   gap: 24px;
   max-width: 960px;
+  width: 100%; 
   margin: 0 auto;
 }
 
@@ -253,6 +265,25 @@ button {
   border: 1px solid rgba(185, 28, 28, 0.2);
 }
 
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.radio-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.radio-option input {
+  accent-color: var(--color-primary);
+}
+
+
 .auth-layout {
   min-height: 100vh;
   display: flex;
@@ -284,6 +315,125 @@ button {
   color: var(--color-muted);
   font-size: 0.95rem;
 }
+
+/* --- Clients page cards --- */
+
+.client-card-list {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.client-card {
+  background: var(--color-surface);
+  border-radius: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 18px 36px -28px rgba(15, 23, 42, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.client-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.client-card-title {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.client-card-meta {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.client-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.client-card-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 24px;
+}
+
+.client-card-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.client-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.9rem;
+}
+
+.client-card-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+
+.client-card-value {
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.client-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.client-card-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.client-status-select {
+  min-width: 160px;
+}
+
+.client-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .client-card-body {
+    grid-template-columns: 1fr;
+  }
+
+  .client-card-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .client-card-actions {
+    justify-content: flex-start;
+  }
+}
+
 
 .item-list {
   list-style: none;
@@ -575,6 +725,97 @@ button {
   flex-direction: column;
   gap: 14px;
 }
+
+/* --- New job card layout for Jobs page --- */
+
+.job-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 18px 36px -28px rgba(15, 23, 42, 0.45);
+}
+
+.job-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.job-card-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.job-card-time {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.job-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.job-card-client {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.job-card-client h4 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.job-card-address {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.job-card-assignees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.job-card-notes {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  line-height: 1.4;
+  white-space: pre-line;
+}
+
+.job-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Make body split into two columns on wider screens */
+@media (min-width: 900px) {
+  .job-card-body {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .job-card-notes {
+    max-width: 320px;
+  }
+}
+
 
 .job-item {
   display: grid;

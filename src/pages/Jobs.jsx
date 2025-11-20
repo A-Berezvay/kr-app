@@ -45,6 +45,8 @@ export default function Jobs() {
   const [actionJobId, setActionJobId] = useState(null)
   const [weekJobs, setWeekJobs] = useState([])
 
+  // --- data subscriptions ---
+
   useEffect(() => {
     const clientsQuery = query(collection(db, 'clients'), orderBy('name', 'asc'))
     const unsub = onSnapshot(clientsQuery, (snapshot) => {
@@ -76,6 +78,8 @@ export default function Jobs() {
     }
   }, [])
 
+  // --- derived data ---
+
   const stats = useMemo(() => {
     const todayStart = startOfToday()
     const todayEnd = endOfToday()
@@ -99,6 +103,18 @@ export default function Jobs() {
 
     return { todayScheduled, weekScheduled, completedThisWeek }
   }, [weekJobs])
+
+  // Only show active/prospect clients when filtering & assigning
+  const assignableClients = useMemo(
+    () =>
+      clients.filter((c) => {
+        const status = (c.status || 'active').toLowerCase()
+        return status !== 'inactive' && status !== 'lost'
+      }),
+    [clients],
+  )
+
+  // --- handlers ---
 
   const handleCreateClick = () => {
     setEditingJob(null)
@@ -187,6 +203,8 @@ export default function Jobs() {
     }
   }
 
+  // --- render ---
+
   return (
     <section className="page">
       <header className="page-header">
@@ -195,22 +213,26 @@ export default function Jobs() {
           View upcoming jobs, assign cleaners, and track completion in real time.
         </p>
       </header>
+
       <Toast
         message={toast?.message}
         type={toast?.type}
         onDismiss={() => setToast(null)}
       />
+
       <StatCards stats={stats} />
+
       <JobFilters
         filters={filters}
         cleaners={cleaners}
-        clients={clients}
+        clients={assignableClients}    // only active / prospect in filters
         onChange={setFilters}
         onCreate={handleCreateClick}
       />
+
       <JobList
         filters={filters}
-        clients={clients}
+        clients={clients}              // keep ALL so old jobs still show
         cleaners={cleaners}
         onAssign={(job) => {
           setAssignJobTarget(job)
@@ -225,15 +247,17 @@ export default function Jobs() {
         onComplete={handleComplete}
         actionJobId={actionJobId}
       />
+
       <JobModal
         open={modalOpen}
         onClose={handleModalClose}
         onSubmit={handleSaveJob}
-        clients={clients}
+        clients={assignableClients}    // only active / prospect when creating/editing
         cleaners={cleaners}
         initialJob={editingJob}
         saving={saving}
       />
+
       <AssignDialog
         open={assignOpen}
         onClose={handleAssignClose}
