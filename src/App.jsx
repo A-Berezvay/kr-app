@@ -13,6 +13,8 @@ import Jobs from './pages/Jobs'
 import Users from './pages/Users'
 import MyJobs from './pages/MyJobs'
 import WorkLog from './pages/WorkLog'
+import Calendar from './pages/Calendar'
+import MyCalendar from './pages/MyCalendar'
 import { AuthProvider, useAuth } from './services/auth'
 import useRole from './hooks/useRole'
 
@@ -67,6 +69,9 @@ function ProtectedLayout() {
               <NavLink to="/jobs" className={navClassName}>
                 Jobs
               </NavLink>
+              <NavLink to="/calendar" className={navClassName}>
+                Calendar
+              </NavLink>
               <NavLink to="/clients" className={navClassName}>
                 Clients
               </NavLink>
@@ -76,9 +81,14 @@ function ProtectedLayout() {
             </>
           )}
           {roleState.isCleaner && (
-            <NavLink to="/my-jobs" className={navClassName}>
-              My Jobs
-            </NavLink>
+            <>
+              <NavLink to="/my-jobs" className={navClassName}>
+                My Jobs
+              </NavLink>
+              <NavLink to="/my-calendar" className={navClassName}>
+                My calendar
+              </NavLink>
+            </>
           )}
           {(roleState.isAdmin || roleState.isCleaner) && (
             <NavLink to="/work-log" className={navClassName}>
@@ -154,10 +164,12 @@ export default function App() {
             <Route element={<AdminRoute />}>
               <Route path="clients" element={<Clients />} />
               <Route path="jobs" element={<Jobs />} />
+              <Route path="calendar" element={<Calendar />} />
               <Route path="users" element={<Users />} />
             </Route>
             <Route element={<CleanerRoute />}>
               <Route path="my-jobs" element={<MyJobs />} />
+              <Route path="my-calendar" element={<MyCalendar />} />
             </Route>
             <Route path="work-log" element={<WorkLog />} />
           </Route>

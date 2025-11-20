@@ -1283,3 +1283,73 @@ button {
     align-items: stretch;
   }
 }
+
+/* Calendar event styling */
+.fc-job-event {
+  font-size: 0.75rem;
+  display: grid;
+  gap: 2px;
+}
+
+.fc-job-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-job-meta {
+  display: flex;
+  gap: 4px;
+  color: var(--color-muted);
+}
+
+.fc-job-assignees {
+  color: var(--color-muted);
+}
+
+/* Calendar layout */
+.calendar-panel {
+  overflow-x: auto;           /* allow horizontal scroll on small screens */
+}
+
+/* Make the calendar itself reasonably wide so it doesn't crush columns */
+.calendar-panel .fc {
+  min-width: 720px;
+}
+
+/* Event body styling inside calendar */
+.fc-event-inner {
+  font-size: 0.75rem;
+  display: grid;
+  gap: 2px;
+}
+
+.fc-event-title {
+  font-weight: 600;
+}
+
+.fc-event-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Toolbar + slots tweaks on smaller screens */
+@media (max-width: 760px) {
+  .calendar-panel .fc-header-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .calendar-panel .fc-toolbar-title {
+    font-size: 1rem;
+  }
+
+  .calendar-panel .fc-timegrid-slot-label {
+    font-size: 0.7rem;
+  }
+
+  .calendar-panel .fc-timegrid-slot {
+    height: 2.2em;
+  }
+}
