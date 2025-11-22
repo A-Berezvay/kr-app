@@ -9,6 +9,9 @@ const emptyForm = {
   status: 'scheduled',
   notes: '',
   assignedUserIds: [],
+  jobLocationId: '',
+  jobLocationLabel: '',
+  jobLocationAddress: '',
 }
 
 const statusOptions = [
@@ -27,7 +30,34 @@ const toDateTimeLocal = (value) => {
   )}:${pad(date.getMinutes())}`
 }
 
-export default function JobModal({ open, onClose, onSubmit, clients, cleaners, initialJob, saving }) {
+// helper: normalise client.locations into array of { id, label, address }
+const normalizeLocations = (client) => {
+  const raw = Array.isArray(client?.locations) ? client.locations : []
+  return raw.map((loc, index) => {
+    if (typeof loc === 'string') {
+      return {
+        id: String(index),
+        label: loc,
+        address: loc,
+      }
+    }
+    return {
+      id: loc.id || String(index),
+      label: loc.label || loc.address || `Location ${index + 1}`,
+      address: loc.address || loc.label || '',
+    }
+  })
+}
+
+export default function JobModal({
+  open,
+  onClose,
+  onSubmit,
+  clients,
+  cleaners,
+  initialJob,
+  saving,
+}) {
   const [form, setForm] = useState(emptyForm)
 
   useEffect(() => {
@@ -40,6 +70,9 @@ export default function JobModal({ open, onClose, onSubmit, clients, cleaners, i
         status: initialJob.status || 'scheduled',
         notes: initialJob.notes || '',
         assignedUserIds: initialJob.assignedUserIds || [],
+        jobLocationId: initialJob.jobLocationId || '',
+        jobLocationLabel: initialJob.jobLocationLabel || '',
+        jobLocationAddress: initialJob.jobLocationAddress || '',
       })
     } else {
       setForm(emptyForm)
@@ -65,14 +98,55 @@ export default function JobModal({ open, onClose, onSubmit, clients, cleaners, i
   }
 
   const activeCleaners = useMemo(
-    () => cleaners.filter((cleaner) => (cleaner.status || 'invited') === 'active' && cleaner.role === 'cleaner'),
+    () =>
+      cleaners.filter(
+        (cleaner) => (cleaner.status || 'invited') === 'active' && cleaner.role === 'cleaner',
+      ),
     [cleaners],
   )
+
+  const client = useMemo(
+    () => clients.find((item) => item.id === form.clientId),
+    [clients, form.clientId],
+  )
+
+  const clientLocations = useMemo(() => normalizeLocations(client), [client])
+
+  // when user changes location in the select
+  const handleLocationChange = (event) => {
+    const locationId = event.target.value
+    const location = clientLocations.find((loc) => loc.id === locationId) || null
+
+    setForm((prev) => ({
+      ...prev,
+      jobLocationId: location ? location.id : '',
+      jobLocationLabel: location ? location.label : '',
+      jobLocationAddress: location ? location.address : '',
+    }))
+  }
+
+  // optional: if client has exactly one location and none selected yet, auto-select it
+  useEffect(() => {
+    if (!client) {
+      return
+    }
+    const locs = clientLocations
+    if (locs.length === 1 && !form.jobLocationId) {
+      const only = locs[0]
+      setForm((prev) => ({
+        ...prev,
+        jobLocationId: only.id,
+        jobLocationLabel: only.label,
+        jobLocationAddress: only.address,
+      }))
+    }
+  }, [client, clientLocations, form.jobLocationId])
 
   const handleSubmit = (event) => {
     event.preventDefault()
     if (!form.clientId || !form.dateTime) return
     const scheduledDate = new Date(form.dateTime)
+
     const payload = {
       clientId: form.clientId,
       date: Timestamp.fromDate(scheduledDate),
@@ -80,13 +154,21 @@ export default function JobModal({ open, onClose, onSubmit, clients, cleaners, i
       status: form.status,
       notes: form.notes,
       assignedUserIds: form.assignedUserIds,
+      // new fields for per-job location
+      jobLocationId: form.jobLocationId || null,
+      jobLocationLabel: form.jobLocationLabel || null,
+      jobLocationAddress: form.jobLocationAddress || null,
     }
     onSubmit(payload)
   }
 
   if (!open) return null
 
-  const client = clients.find((item) => item.id === form.clientId)
+  const infoAddress = form.jobLocationAddress || client?.address || ''
+  const infoLabel =
+    form.jobLocationLabel ||
+    (clientLocations.length === 1 ? clientLocations[0].label : '') ||
+    ''
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -100,7 +182,22 @@ export default function JobModal({ open, onClose, onSubmit, clients, cleaners, i
         <div className="modal-body job-modal-body">
           <label className="form-field">
             <span>Client</span>
-            <select className="select" value={form.clientId} onChange={handleChange('clientId')} required>
+            <select
+              className="select"
+              value={form.clientId}
+              onChange={(e) => {
+                // reset location when switching client
+                const value = e.target.value
+                setForm((prev) => ({
+                  ...prev,
+                  clientId: value,
+                  jobLocationId: '',
+                  jobLocationLabel: '',
+                  jobLocationAddress: '',
+                }))
+              }}
+              required
+            >
               <option value="" disabled>
                 Select a client
               </option>
@@ -111,6 +208,27 @@ export default function JobModal({ open, onClose, onSubmit, clients, cleaners, i
               ))}
             </select>
           </label>
+
+          {clientLocations.length > 0 && (
+            <label className="form-field">
+              <span>Location</span>
+              <select
+                className="select"
+                value={form.jobLocationId}
+                onChange={handleLocationChange}
+              >
+                <option value="">
+                  {clientLocations.length > 1 ? 'Select a location' : 'Default location'}
+                </option>
+                {clientLocations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <label className="form-field">
             <span>Date &amp; time</span>
             <input
@@ -163,7 +281,9 @@ export default function JobModal({ open, onClose, onSubmit, clients, cleaners, i
                     onChange={() => toggleCleaner(cleaner.id)}
                   />
                   <div>
-                    <span className="option-title">{cleaner.displayName || cleaner.email}</span>
+                    <span className="option-title">
+                      {cleaner.displayName || cleaner.email}
+                    </span>
                     {cleaner.email && cleaner.displayName && (
                       <span className="option-subtitle">{cleaner.email}</span>
                     )}
@@ -175,10 +295,14 @@ export default function JobModal({ open, onClose, onSubmit, clients, cleaners, i
               )}
             </div>
           </div>
-          {client?.address && (
+
+          {infoAddress && (
             <div className="info-note">
-              <strong>Client address:</strong> {client.address}
-              {client.notes && <div className="helper-text">Notes: {client.notes}</div>}
+              <strong>Job address:</strong> {infoAddress}
+              {infoLabel && <div className="helper-text">Location: {infoLabel}</div>}
+              {client?.notes && (
+                <div className="helper-text">Client notes: {client.notes}</div>
+              )}
             </div>
           )}
         </div>

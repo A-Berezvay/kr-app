@@ -14,6 +14,7 @@ import {
 } from '../lib/dates'
 import { markJobCompleted, markJobStarted, subscribeToCleanerJobs } from '../services/jobs'
 import { recordWorkLogCompletion, recordWorkLogStart } from '../services/workLogs'
+import { getClientDisplayName } from '../lib/clients'
 
 const mapSnapshot = (snapshot) =>
   snapshot.docs.map((doc) => ({
@@ -31,6 +32,7 @@ export default function MyJobs() {
   const [toast, setToast] = useState(null)
   const [actionJobId, setActionJobId] = useState(null)
 
+  // Load clients
   useEffect(() => {
     const clientsQuery = query(collection(db, 'clients'), orderBy('name', 'asc'))
     const unsub = onSnapshot(clientsQuery, (snapshot) => {
@@ -39,6 +41,7 @@ export default function MyJobs() {
     return unsub
   }, [])
 
+  // Load jobs for current cleaner + tab
   useEffect(() => {
     if (!user) return
     const { start, end } =
@@ -79,61 +82,69 @@ export default function MyJobs() {
 
   const buildLogPayload = (job) => {
     const client = clientMap.get(job.clientId)
+    const locations = Array.isArray(client?.locations) ? client.locations : []
+
+    // support both new (jobLocationId) and old (clientLocationId) field names
+    const jobLocationId = job.jobLocationId || job.clientLocationId || null
+    const jobLocation = jobLocationId
+      ? locations.find((loc) => loc.id === jobLocationId)
+      : null
+
+    const addressParts = jobLocation
+      ? [jobLocation.address, jobLocation.city, jobLocation.zip]
+      : [client?.address, client?.city, client?.zip]
+
+    const address = addressParts.filter(Boolean).join(', ')
+
     return {
       jobId: job.id,
       jobDate: job.date,
       clientId: job.clientId,
-      clientName: client?.name,
+      clientName: client ? getClientDisplayName(client) : null,
+      clientLocationId: jobLocationId,
+      clientLocationLabel: jobLocation?.label || null,
+      clientAddress: address || null,
       userId: user?.uid,
       userName: roleContext?.profile?.displayName || user?.displayName || user?.email,
       userEmail: user?.email,
     }
   }
 
-const handleStart = async (job) => {
-  setActionJobId(job.id)
-  try {
-    console.log('>>> handleStart: calling markJobStarted')
-    await markJobStarted(job.id)
-    console.log('>>> handleStart: markJobStarted OK')
+  const handleStart = async (job) => {
+    setActionJobId(job.id)
+    try {
+      await markJobStarted(job.id)
 
-    if (user) {
-      console.log('>>> handleStart: calling recordWorkLogStart')
-      await recordWorkLogStart(buildLogPayload(job))
-      console.log('>>> handleStart: recordWorkLogStart OK')
+      if (user) {
+        await recordWorkLogStart(buildLogPayload(job))
+      }
+
+      setToast({ type: 'success', message: 'Job marked as in progress.' })
+    } catch (error) {
+      console.error('handleStart ERROR:', error)
+      setToast({ type: 'error', message: 'Failed to update job status.' })
+    } finally {
+      setActionJobId(null)
     }
-
-    setToast({ type: 'success', message: 'Job marked as in progress.' })
-  } catch (error) {
-    console.error('handleStart ERROR:', error)
-    setToast({ type: 'error', message: 'Failed to update job status.' })
-  } finally {
-    setActionJobId(null)
   }
-}
 
-const handleComplete = async (job) => {
-  setActionJobId(job.id)
-  try {
-    console.log('>>> handleComplete: calling markJobCompleted')
-    await markJobCompleted(job.id)
-    console.log('>>> handleComplete: markJobCompleted OK')
+  const handleComplete = async (job) => {
+    setActionJobId(job.id)
+    try {
+      await markJobCompleted(job.id)
 
-    if (user) {
-      console.log('>>> handleComplete: calling recordWorkLogCompletion')
-      await recordWorkLogCompletion(buildLogPayload(job))
-      console.log('>>> handleComplete: recordWorkLogCompletion OK')
+      if (user) {
+        await recordWorkLogCompletion(buildLogPayload(job))
+      }
+
+      setToast({ type: 'success', message: 'Job marked as complete.' })
+    } catch (error) {
+      console.error('handleComplete ERROR:', error)
+      setToast({ type: 'error', message: 'Failed to update job status.' })
+    } finally {
+      setActionJobId(null)
     }
-
-    setToast({ type: 'success', message: 'Job marked as complete.' })
-  } catch (error) {
-    console.error('handleComplete ERROR:', error)
-    setToast({ type: 'error', message: 'Failed to update job status.' })
-  } finally {
-    setActionJobId(null)
   }
-}
-
 
   const handleCopy = async (text) => {
     try {
@@ -192,25 +203,48 @@ const handleComplete = async (job) => {
             const status = job.status || 'scheduled'
             const disableStart = status !== 'scheduled'
             const disableComplete = status === 'completed' || status === 'cancelled'
+
+            const locations = Array.isArray(client?.locations) ? client.locations : []
+            const jobLocationId = job.jobLocationId || job.clientLocationId || null
+            const jobLocation = jobLocationId
+              ? locations.find((loc) => loc.id === jobLocationId)
+              : null
+
+            const addressParts = jobLocation
+              ? [jobLocation.address, jobLocation.city, jobLocation.zip]
+              : [client?.address, client?.city, client?.zip]
+
+            const displayAddress = addressParts.filter(Boolean).join(', ')
+
+            const locationLabel =
+              jobLocation?.label || (displayAddress ? 'Location' : null)
+
+            const clientName = client ? getClientDisplayName(client) : 'Unknown client'
+
             return (
               <article key={job.id} className="panel my-job-card">
                 <header className="my-job-header">
                   <div>
                     <h3>{formatDayLabel(jobDate)}</h3>
-                    <p>{formatTime(jobDate)} · {formatDuration(job.durationMinutes)}</p>
+                    <p>
+                      {formatTime(jobDate)} · {formatDuration(job.durationMinutes)}
+                    </p>
                   </div>
                   <span className={`badge ${statusClass(status)}`}>{statusLabel(status)}</span>
                 </header>
                 <div className="my-job-body">
                   <div className="my-job-client">
-                    <strong>{client?.name || 'Unknown client'}</strong>
-                    {client?.address && (
+                    <strong>{clientName}</strong>
+                    {displayAddress && (
                       <div className="address-row">
-                        <span>{client.address}</span>
+                        <span>
+                          {locationLabel && <strong>{locationLabel}: </strong>}
+                          {displayAddress}
+                        </span>
                         <button
                           type="button"
                           className="icon-button"
-                          onClick={() => handleCopy(client.address)}
+                          onClick={() => handleCopy(displayAddress)}
                           aria-label="Copy address"
                         >
                           📋

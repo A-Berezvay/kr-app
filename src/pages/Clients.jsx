@@ -332,10 +332,31 @@ export default function Clients() {
                 </div>
 
                 <div className="client-card-column">
-                  <div className="client-card-field">
-                    <span className="client-card-label">Location</span>
-                    <span className="client-card-value">{location || '—'}</span>
-                  </div>
+                <div className="client-card-field">
+                  <span className="client-card-label">
+                    {Array.isArray(c.locations) && c.locations.length > 1
+                      ? 'Locations'
+                      : 'Location'}
+                  </span>
+
+                  {Array.isArray(c.locations) && c.locations.length > 0 ? (
+                    <div className="client-card-value" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {c.locations.map((loc, idx) => {
+                        const label = loc.label || `Location ${idx + 1}`
+                        const address = [loc.address, loc.city, loc.zip].filter(Boolean).join(', ')
+                        return (
+                          <div key={loc.id || idx}>
+                            <strong>{label}:</strong> {address}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <span className="client-card-value">
+                      {[c.address, c.city, c.zip].filter(Boolean).join(', ') || '—'}
+                    </span>
+                  )}
+                </div>
                   <div className="client-card-field">
                     <span className="client-card-label">Notes</span>
                     <span className="client-card-value">
